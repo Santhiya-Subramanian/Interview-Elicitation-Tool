@@ -1,5 +1,6 @@
 import tkinter
 from tkinter import *
+from tkinter import ttk
 from tkinter import filedialog
 from tkinter import font
 import pygame
@@ -13,6 +14,7 @@ from pydub import AudioSegment
 import tempfile
 import speech_recognition as sr
 from tkinter import colorchooser
+import tkinter.messagebox as mb
 
 main_window = Tk()
 pw = PanedWindow(main_window, orient=HORIZONTAL)
@@ -239,13 +241,59 @@ def clear_highlight():
     text_box.tag_remove(highlightCount, "sel.first", "sel.last")
 
 
+global extracted_text
+
+
 def gettext():
+    global extracted_text
     extracted_text = text_box.get("sel.first", "sel.last")
-    annotation_box.insert(END, extracted_text)
+    print(extracted_text)
+    annotation_box.insert('', 'end', values=(extracted_text, '', ''))
 
 
 def delete_annotation():
-    annotation_box.delete(ANCHOR)
+    selected_item = annotation_box.selection()[0]
+    annotation_box.delete(selected_item)
+
+
+def close_win(top):
+    top.destroy()
+
+
+def add_Tag():
+    top = Toplevel(main_window)
+    top.geometry("750x250")
+
+    def gettag_values():
+        current_item = annotation_box.focus()
+        current_value = annotation_box.item(current_item, 'values')
+        print(current_value[0])
+        annotation_box.item(current_item, values=(current_value[0], dropdown.get(), description_text.get("1.0", END)))
+        print(dropdown.get())
+        print(description_text.get("1.0", END))
+
+
+    tag_label = Label(top, text='Select the Tag')
+    tag_label.pack(pady=10)
+    tags = ['Requirement', 'Follow up', 'Mistake', 'Custom']
+    dropdown = ttk.Combobox(top, value=tags)
+    dropdown.current(0)
+    dropdown.pack(pady=5)
+
+    description_label = Label(top, text='Description')
+    description_label.pack(pady=5)
+
+    description_frame = Frame(top)
+    description_frame.pack()
+
+    description_scroll = Scrollbar(description_frame)
+    description_scroll.pack(side=RIGHT, fill=Y)
+
+    description_text = Text(description_frame, width=40, height=3, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
+    description_text.pack(pady=10)
+
+    button = Button(top, text="Ok", command=lambda: [gettag_values(), close_win(top)])
+    button.pack(pady=10)
 
 
 # MenuBar Creation
@@ -309,16 +357,16 @@ status_bar.pack(fill=X, side=BOTTOM, ipady=1)
 # Create Player Control Frame
 control_frame = Frame(rightFrame)
 control_frame.pack(pady=10)
-forward_btn = Button(control_frame, image=resized_forwardbtn_img, borderwidth=0)
 play_pause_btn = Button(control_frame, image=resized_play_pausebtn_img, borderwidth=0, command=lambda: play_pause())
 # pause_btn = Button(control_frame, image=resized_pausebtn_img, borderwidth=0, command=lambda: pause_audio(paused))
 stop_btn = Button(control_frame, image=resized_stopbtn_img, borderwidth=0, command=stop_audio)
+forward_btn = Button(control_frame, image=resized_forwardbtn_img, borderwidth=0)
 rewind_btn = Button(control_frame, image=resized_rewindbtn_img, borderwidth=0)
-forward_btn.grid(row=0, column=0, padx=10)
-play_pause_btn.grid(row=0, column=1, padx=10)
+play_pause_btn.grid(row=0, column=0, padx=10)
 # pause_btn.grid(row=0, column=1, padx=10)
 stop_btn.grid(row=0, column=2, padx=10)
-rewind_btn.grid(row=0, column=3, padx=10)
+forward_btn.grid(row=0, column=3, padx=10)
+rewind_btn.grid(row=0, column=4, padx=10)
 
 slider = ttk.Scale(rightFrame, from_=0, to=100, orient=HORIZONTAL, value=0, length=360, command=slide)
 slider.pack(pady=10)
@@ -334,7 +382,7 @@ text_frame.pack(pady=10)
 text_scroll = Scrollbar(text_frame)
 text_scroll.pack(side=RIGHT, fill=Y)
 
-text_box = Text(text_frame, width=40, height=10, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
+text_box = Text(text_frame, width=40, height=15, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
 text_box.pack(pady=10)
 
 # annotation tool bar
@@ -353,10 +401,25 @@ extract_button.grid(row=0, column=2, sticky=W, padx=5)
 delete_annotation_button = Button(tool_bar, text='Remove Annotation', command=lambda: delete_annotation())
 delete_annotation_button.grid(row=0, column=3, sticky=W, padx=5)
 
-annotation_box = Listbox(annotationFrame, bg='white', fg='black', width=60)
+s = ttk.Style()
+s.theme_use('clam')
+
+annotation_box = ttk.Treeview(annotationFrame, column=("c1", "c2", "c3"), show='headings', height=5)
+
+annotation_box.column("# 1", anchor=CENTER)
+annotation_box.heading("# 1", text="Sentence")
+annotation_box.column("# 2", anchor=CENTER)
+annotation_box.heading("# 2", text="Annotation Tag")
+annotation_box.column("# 3", anchor=CENTER)
+annotation_box.heading("# 3", text="Description")
 annotation_box.pack(pady=20)
 
-pw.add(leftFrame)
+# annotation_box = Listbox(annotationFrame, bg='white', fg='black', width=60)
+
+addannotate_Tag = Button(annotationFrame, text='Add Tag', command=lambda: add_Tag())
+addannotate_Tag.pack(pady=20)
+
+pw.add(leftFrame, width=150)
 pw.add(rightFrame)
 pw.add(annotationFrame)
 pw.pack(fill=BOTH, expand=True)
