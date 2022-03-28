@@ -1,3 +1,4 @@
+import csv
 import tkinter
 from tkinter import *
 from tkinter import ttk
@@ -15,6 +16,9 @@ import tempfile
 import speech_recognition as sr
 from tkinter import colorchooser
 import tkinter.messagebox as mb
+from openpyxl.workbook import Workbook
+from openpyxl import load_workbook
+import pandas as pd
 
 main_window = Tk()
 pw = PanedWindow(main_window, orient=HORIZONTAL)
@@ -222,6 +226,64 @@ def transcribe_action():
     os.remove(output_file)
 
 
+global opened_file_name
+opened_file_name = False
+
+
+def fileoption():
+    top = Toplevel(main_window)
+    top.title("File Menu")
+    top.geometry("150x150")
+
+    def open_file():
+        text_box.delete("1.0", END)
+        transcribe_text_file = filedialog.askopenfilenames()
+
+        if transcribe_text_file:
+            global opened_file_name
+            opened_file_name = transcribe_text_file[0]
+
+        print(opened_file_name)
+        transcribed_file_path = os.path.split(transcribe_text_file[0])
+        print(transcribed_file_path[1])
+        text_file = transcribed_file_path[1]
+        transcribe_text_file = open((transcribe_text_file[0]), 'r')
+        transcribed_text = transcribe_text_file.read()
+        text_box.insert(END, transcribed_text)
+        transcribe_text_file.close()
+        top.destroy()
+
+    def save_file():
+        global opened_file_name
+        if opened_file_name:
+            transcribe_file_save = open(opened_file_name, 'w')
+            transcribe_file_save.write(text_box.get("1.0", END))
+            transcribe_file_save.close()
+        else:
+            saveAs_file()
+        top.destroy()
+
+    def saveAs_file():
+        transcribe_file_save = filedialog.asksaveasfilename(defaultextension=".*",
+                                                            filetypes=(("Text File", "*.txt"), ("Word File", "*.docx")))
+        if transcribe_file_save:
+            file_name = transcribe_file_save
+            filepath = os.path.split(transcribe_file_save)
+            file_name = file_name.replace(filepath[0], "")
+
+            transcribe_file_save = open(transcribe_file_save, 'w')
+            transcribe_file_save.write(text_box.get("1.0", END))
+            transcribe_file_save.close()
+        top.destroy()
+
+    open_btn = Button(top, text="Open", command=lambda: open_file())
+    open_btn.pack(pady=5)
+    open_btn = Button(top, text="Save", command=lambda: save_file())
+    open_btn.pack(pady=5)
+    open_btn = Button(top, text="SaveAs", command=lambda: saveAs_file())
+    open_btn.pack(pady=5)
+
+
 global highlightCount
 highlightCount = 0
 
@@ -260,6 +322,61 @@ def close_win(top):
     top.destroy()
 
 
+def annotation_box_file():
+    top = Toplevel(main_window)
+    top.title("File Menu")
+    top.geometry("150x150")
+
+    current_item = annotation_box.focus()
+    current_value = annotation_box.item(current_item, 'values')
+    print(current_value)
+
+    def open_list():
+        excel_file_name = filedialog.askopenfilenames()
+        if excel_file_name:
+            try:
+                excel_file_name = r"{}".format(excel_file_name[0])
+                df = pd.read_excel(excel_file_name)
+            except ValueError:
+                print("file couldn't be open")
+
+        clear_list()
+
+        annotation_box['column'] = list(df.columns)
+        annotation_box['show'] = "headings"
+
+        for column in annotation_box["column"]:
+            annotation_box.heading(column, text=column)
+
+        df_rows = df.to_numpy().tolist()
+        for row in df_rows:
+            annotation_box.insert("", "end", values=row)
+
+    def save_list():
+        if len(annotation_box.get_children()) < 1:
+            mb.showinfo("No data", "No data to export")
+            return False
+        save_annotation_list = filedialog.asksaveasfilename(defaultextension=".*",
+                                                            filetypes=(("CSV File", "*.csv"), ("Word File", "*.docx")))
+        with open(save_annotation_list, mode='a', newline='') as my_excel_file:
+            write = csv.writer(my_excel_file, dialect='excel')
+            for i in annotation_box.get_children():
+                row = annotation_box.item(i)['values']
+                write.writerow(row)
+        mb.showinfo("Message", "Export successfully")
+        top.destroy()
+
+    def clear_list():
+        annotation_box.delete(*annotation_box.get_children())
+
+    open_btn = Button(top, text="Open", command=lambda: open_list())
+    open_btn.pack(pady=5)
+    open_btn = Button(top, text="Save", command=lambda: save_list())
+    open_btn.pack(pady=5)
+    open_btn = Button(top, text="Clear", command=lambda: clear_list())
+    open_btn.pack(pady=5)
+
+
 def add_Tag():
     top = Toplevel(main_window)
     top.geometry("750x250")
@@ -268,17 +385,38 @@ def add_Tag():
         current_item = annotation_box.focus()
         current_value = annotation_box.item(current_item, 'values')
         print(current_value[0])
-        annotation_box.item(current_item, values=(current_value[0], dropdown.get(), description_text.get("1.0", END)))
-        print(dropdown.get())
-        print(description_text.get("1.0", END))
+        annotation_box.item(current_item, values=(current_value[0], dropdown_label.get("1.0", END), description_text.get("1.0", END)))
+        # print(dropdown_label.get("1.0", END))
+        # print(description_text.get("1.0", END))
 
 
     tag_label = Label(top, text='Select the Tag')
     tag_label.pack(pady=10)
     tags = ['Requirement', 'Follow up', 'Mistake', 'Custom']
-    dropdown = ttk.Combobox(top, value=tags)
-    dropdown.current(0)
+    list_frame = Frame(top)
+    list_frame.pack()
+
+    list_scroll = Scrollbar(list_frame)
+    list_scroll.pack(side=RIGHT, fill=Y)
+
+    dropdown_label = Text(list_frame, width=20, height=1)
+    dropdown_label.pack()
+
+    def selectedValue(evt):
+        for dropvalue in dropdown.curselection():
+            print(dropvalue)
+        dropdown_label.delete("1.0", "end")
+        for dropvalue in dropdown.curselection():
+            selected_tag_value = dropdown.get(dropvalue)
+            dropdown_label.insert(END, f'{selected_tag_value}, ')
+
+    dropdown = Listbox(list_frame, selectmode="multiple", yscrollcommand=list_scroll.set)
+    dropdown.bind('<<ListboxSelect>>', selectedValue)
     dropdown.pack(pady=5)
+
+    for each_item in range(len(tags)):
+        dropdown.insert(END, tags[each_item])
+        dropdown.itemconfig(each_item)
 
     description_label = Label(top, text='Description')
     description_label.pack(pady=5)
@@ -289,7 +427,7 @@ def add_Tag():
     description_scroll = Scrollbar(description_frame)
     description_scroll.pack(side=RIGHT, fill=Y)
 
-    description_text = Text(description_frame, width=40, height=3, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
+    description_text = Text(description_frame, width=60, height=3, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
     description_text.pack(pady=10)
 
     button = Button(top, text="Ok", command=lambda: [gettag_values(), close_win(top)])
@@ -376,6 +514,9 @@ slider.pack(pady=10)
 transcribe_button = Button(rightFrame, text='Transcribe', command=lambda: transcribe_action())
 transcribe_button.pack(pady=10)
 
+transcribe_file = Button(rightFrame, text='File', command=lambda: fileoption())
+transcribe_file.pack()
+
 text_frame = Frame(rightFrame)
 text_frame.pack(pady=10)
 
@@ -400,6 +541,9 @@ extract_button.grid(row=0, column=2, sticky=W, padx=5)
 
 delete_annotation_button = Button(tool_bar, text='Remove Annotation', command=lambda: delete_annotation())
 delete_annotation_button.grid(row=0, column=3, sticky=W, padx=5)
+
+annotation_file = Button(tool_bar, text='File', command=lambda: annotation_box_file())
+annotation_file.grid(row=0, column=4, sticky=W, padx=5)
 
 s = ttk.Style()
 s.theme_use('clam')
