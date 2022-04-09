@@ -19,6 +19,7 @@ import tkinter.messagebox as mb
 from openpyxl.workbook import Workbook
 from openpyxl import load_workbook
 import pandas as pd
+from google.cloud import speech_v1p1beta1 as speech
 
 main_window = Tk()
 pw = PanedWindow(main_window, orient=HORIZONTAL)
@@ -154,76 +155,105 @@ def slide(x):
 def transcribe_action():
     audio_file = audio_box.curselection()
     input_file_name = audio_box.get(audio_file)
-    print(f'{path}{input_file_name}')
-    input_file_path = f'{path}{input_file_name}'
-
-    load_audio_to_mutagen = MP3(input_file_path)
-    audio_total_length = load_audio_to_mutagen.info.length
-    length = float(audio_total_length) * 1000
-    print(float(length))
-
-    temp = tempfile.TemporaryFile()
-    path_output = os.path.split(temp.name)
-    global output_file
-    output_file = f'{path_output[1]}.wav'
-    print(output_file)
-    temp.close()
-
-    sound = AudioSegment.from_mp3(input_file_path)
-    sound.export(output_file, format='wav')
-
-    print(audio_total_length)
-    if not os.path.isdir("splitaudio"):
-        os.mkdir("splitaudio")
-
-    audio = AudioSegment.from_file(output_file)
-    lengthaudio = len(audio)
-    print("Length of Audio File", lengthaudio)
-
-    start = 0
-    # # In Milliseconds, this will cut 10 Sec of audio
-    threshold = 60000
-    end = 0
-    counter = 0
-
-    file = open("recognized.txt", "r+")
-    file.truncate(0)
-    file.close()
-
+    print(input_file_name)
+    # mb.showinfo("Json key", "Choose Json key")
     text_box.delete("1.0", "end")
 
-    while start < len(audio):
+    # upload your json key
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/santh/PycharmProjects/pythonProject/IET-Tool/json_key.json'
+    client = speech.SpeechClient()
 
-        end += threshold
+    media_uri_path = 'gs://speech_to_text_audio_file/'
+    audio_path = f'{media_uri_path}{input_file_name}'
+    print(path[1])
 
-        chunk = audio[start:end]
+    # client.RecognitionAudio(uri=media_uri)
+    audio_file = speech.RecognitionAudio(uri=audio_path)
 
-        filename = f'splitaudio/chunk{counter}.wav'
+    diarization_config = speech.SpeakerDiarizationConfig(
+        enable_speaker_diarization=True,
+        min_speaker_count=2,
+        max_speaker_count=10,
+    )
 
-        chunk.export(filename, format="wav")
-        r = sr.Recognizer()
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.MP3,
+        sample_rate_hertz=48000,
+        language_code="en-US",
+        diarization_config=diarization_config,
+        # model='audio'
+    )
 
-        fh = open("recognized.txt", "a+")
+    operation = client.long_running_recognize(
+        config=config,
+        audio=audio_file
+    )
 
-        with sr.AudioFile(filename) as source:
-            audio_text = r.record(source)
+    response = operation.result(timeout=90)
+    # print(response)
 
-            try:
-                transcribed_text = r.recognize_google(audio_text)
-                fh.write(transcribed_text + " ")
-            except:
-                print('something went wrong')
+    result = response.results[-1]
 
-        fh.close()
-        counter += 1
+    words_info = result.alternatives[0].words
 
-        start += threshold
+    words_list = []
 
-        fh = open("recognized.txt", "r+")
-        text_box.insert('end', fh.read())
-        fh.close()
+    for word_info in words_info:
+        words_list.append({
+            'word': word_info.word,
+            'speaker_tag': word_info.speaker_tag,
+            'start_time': word_info.start_time,
+            'end_time': word_info.end_time,
+        })
+    # print(words_list)
 
-    os.remove(output_file)
+    current_speaker = words_list[0]['speaker_tag']
+    current_line = []
+    script = []
+
+    for item in words_list:
+        if item['speaker_tag'] != current_speaker:
+            script.append({
+                'speaker': current_speaker,
+                'line': current_line
+            })
+            current_line = []
+            current_speaker = item['speaker_tag']
+        else:
+            current_line.append(item['word'])
+
+    script.append({
+        'speaker': current_speaker,
+        'line': current_line
+    })
+
+    for line in script:
+        script = f"Speaker {line['speaker']}: " + " ".join(line['line'])
+        # print(script)
+        text_box.insert(END, script)
+
+    findtext = 'speaker'
+
+    if findtext:
+        idx = '1.0'
+        while 1:
+            # searches for desired string from index 1
+            idx = text_box.search(findtext, idx, nocase=1, stopindex=END)
+
+            if not idx: break
+
+            # last index sum of current index and
+            # length of text
+            lastidx = '%s+%dc' % (idx, len(findtext))
+
+            text_box.insert(idx, '\n\n')
+
+            # overwrite 'Found' at idx
+            text_box.tag_add('found', idx, lastidx)
+            idx = lastidx
+
+        # mark located string as red
+        text_box.tag_config('found', foreground='red')
 
 
 global opened_file_name
@@ -332,6 +362,7 @@ def annotation_box_file():
     print(current_value)
 
     def open_list():
+        global df
         excel_file_name = filedialog.askopenfilenames()
         if excel_file_name:
             try:
@@ -351,6 +382,8 @@ def annotation_box_file():
         df_rows = df.to_numpy().tolist()
         for row in df_rows:
             annotation_box.insert("", "end", values=row)
+
+        top.destroy()
 
     def save_list():
         if len(annotation_box.get_children()) < 1:
@@ -432,6 +465,46 @@ def add_Tag():
 
     button = Button(top, text="Ok", command=lambda: [gettag_values(), close_win(top)])
     button.pack(pady=10)
+
+
+def lookup():
+    # query = search_entry.get()
+    # selections = []
+    # for child in tree.get_children():
+    #     if query.lower() in tree.item(child)['values'].lower():  # compare strings in  lower cases.
+    #         print(tree.item(child)['values'])
+    #         selections.append(child)
+    # print('search completed')
+    # tree.selection_set(selections)
+    lookup_record = search_entry.get()
+    selections = []
+    # print(lookup_record)
+    annotation_box['column'] = list(df.columns)
+    annotation_box['show'] = "headings"
+
+    for record in annotation_box.get_children():
+        if lookup_record in annotation_box.item(record)['values']:
+            print(annotation_box.item(record)['values'])
+            selections.append(record)
+    annotation_box.selection_set(selections)
+
+    search.destroy()
+
+
+def searchRecords():
+    global search_entry, search
+    search = Toplevel(main_window)
+    search.title('Lookup Records')
+    search.geometry('400x200')
+
+    search_frame = LabelFrame(search, text='Annotation Name')
+    search_frame.pack(padx=10, pady=10)
+
+    search_entry = Entry(search_frame)
+    search_entry.pack(padx=20, pady=20)
+
+    search_button = Button(search_frame, text='Search Annotation', command=lookup)
+    search_button.pack(padx=20, pady=20)
 
 
 # MenuBar Creation
@@ -544,6 +617,9 @@ delete_annotation_button.grid(row=0, column=3, sticky=W, padx=5)
 
 annotation_file = Button(tool_bar, text='File', command=lambda: annotation_box_file())
 annotation_file.grid(row=0, column=4, sticky=W, padx=5)
+
+annotation_search = Button(tool_bar, text='Search', command=lambda: searchRecords())
+annotation_search.grid(row=0, column=5, sticky=W, padx=5)
 
 s = ttk.Style()
 s.theme_use('clam')
