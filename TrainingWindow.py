@@ -1,4 +1,5 @@
 import csv
+import datetime
 import tkinter
 from tkinter import *
 from tkinter import ttk
@@ -103,6 +104,9 @@ def play_pause():
         pause_audio(paused)
 
 
+global audio_total_length
+
+
 def audio_Time():
     current_time = pygame.mixer.music.get_pos() / 1000
     # slider_label.config(text=f'Slider: {int(slider.get())} and Song Pos: {int(current_time)}')
@@ -114,6 +118,8 @@ def audio_Time():
     load_audio_to_mutagen = MP3(audio)
     global audio_total_length
     audio_total_length = load_audio_to_mutagen.info.length
+    print("audio total length type " )
+    print(type(audio_total_length))
     formatted_audio_length = time.strftime('%M:%S', time.gmtime(audio_total_length))
 
     current_time += 1
@@ -208,6 +214,11 @@ def transcribe_action():
     # print(words_list)
 
     current_speaker = words_list[0]['speaker_tag']
+    speaker_start_time = words_list[0]['start_time']
+    speaker_end_time = words_list[0]['end_time']
+    # print(current_speaker)
+    # print(speaker_start_time)
+    # print(speaker_end_time)
     current_line = []
     script = []
 
@@ -215,45 +226,81 @@ def transcribe_action():
         if item['speaker_tag'] != current_speaker:
             script.append({
                 'speaker': current_speaker,
-                'line': current_line
+                'line': current_line,
+                'start_time': speaker_start_time,
+                'end_time': speaker_end_time
             })
             current_line = []
             current_speaker = item['speaker_tag']
+            speaker_start_time = item['start_time']
+            speaker_end_time = item['end_time']
         else:
             current_line.append(item['word'])
 
     script.append({
         'speaker': current_speaker,
-        'line': current_line
+        'line': current_line,
+        'start_time': speaker_start_time,
+        'end_time': speaker_end_time
     })
-
+    timer_list = []
     for line in script:
-        script = f"Speaker {line['speaker']}: " + " ".join(line['line'])
-        # print(script)
+        startTime = line['start_time']
+        str_val = str(startTime)
+        script = f"{str_val}  Speaker{line['speaker']}: " + " ".join(line['line'])
+
         text_box.insert(END, script)
+        findtext = f"{str_val}  {'speaker'}"
+        print('timer_list', {str_val})
 
-    findtext = 'speaker'
+        timer_list.append(str_val)
+        print('list', timer_list)
 
-    if findtext:
-        idx = '1.0'
-        while 1:
-            # searches for desired string from index 1
-            idx = text_box.search(findtext, idx, nocase=1, stopindex=END)
+        def timelink(evt):
+            mb.showinfo(title="success", message="clicked")
+            print(timer_list)
 
-            if not idx: break
+            # print(text_box.get("sel.first", "sel.last"))
+            # print('b', {str_val})
+            # print('c', {type(str_val)})
+            # secs = str_val.total_seconds()
+            # hours = int(secs / 3600)
+            # minutes = int(secs / 60) % 60
+            # print(secs)
+            # print(hours)
+            # print(minutes)
+            # print(type(secs))
+            # print(type(secs))
+            # print(type(secs))
+            # time_obj = datetime.datetime.strptime(str(startTime), '%H:%M:%S').time()
+            # print(time_obj)
+            # print(type(time_obj))
+            # formatted_audio_length = time.strptime('%M:%S', time.time(str_val))
+            # print(formatted_audio_length)
+            # print(type(formatted_audio_length))
 
-            # last index sum of current index and
-            # length of text
-            lastidx = '%s+%dc' % (idx, len(findtext))
+        text_box.bind('<Double-1>', timelink)
 
-            text_box.insert(idx, '\n\n')
+        if findtext:
+            idx = '1.0'
+            while 1:
+                # searches for desired string from index 1
+                idx = text_box.search(findtext, idx, nocase=1, stopindex=END)
 
-            # overwrite 'Found' at idx
-            text_box.tag_add('found', idx, lastidx)
-            idx = lastidx
+                if not idx: break
 
-        # mark located string as red
-        text_box.tag_config('found', foreground='red')
+                # last index sum of current index and
+                # length of text
+                lastidx = '%s+%dc' % (idx, len(findtext))
+
+                text_box.insert(idx, '\n\n')
+
+                # overwrite 'Found' at idx
+                text_box.tag_add('found', idx, lastidx)
+                idx = lastidx
+
+            # mark located string as red
+            text_box.tag_config('found', foreground='red')
 
 
 global opened_file_name
