@@ -51,7 +51,8 @@ def play_audio():
     print(audio)
 
     pygame.mixer.music.load(audio)
-    pygame.mixer.music.play(loops=0)
+    print(slider.get())
+    pygame.mixer.music.play(loops=0, start=int(slider.get()))
     audio_Label.config(text=audio_name)
     # call audio length function
     audio_Time()
@@ -91,14 +92,14 @@ def pause_audio(is_paused):
         paused = True
 
 
-global count
-count = 0
+global play
+play = False
 
 
 def play_pause():
-    global count
-    count = count + 1
-    if count == 1:
+    global play
+    play = not play
+    if play:
         play_audio()
     else:
         pause_audio(paused)
@@ -166,7 +167,7 @@ def transcribe_action():
     text_box.delete("1.0", "end")
 
     # upload your json key
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/santh/PycharmProjects/pythonProject/IET-Tool/json_key.json'
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'C:/Users/sdebn/Downloads/json_key.json'
     client = speech.SpeechClient()
 
     media_uri_path = 'gs://speech_to_text_audio_file/'
@@ -208,7 +209,7 @@ def transcribe_action():
         words_list.append({
             'word': word_info.word,
             'speaker_tag': word_info.speaker_tag,
-            'start_time': word_info.start_time,
+            'start_time': word_info.start_time.seconds,
             'end_time': word_info.end_time,
         })
     # print(words_list)
@@ -257,13 +258,23 @@ def transcribe_action():
         print('list', timer_list)
 
         def timelink(evt):
-            mb.showinfo(title="success", message="clicked")
-            print(timer_list)
-
-            # print(text_box.get("sel.first", "sel.last"))
+            timestamp = text_box.get("sel.first", "sel.last")
+            print(type(timestamp))
             # print('b', {str_val})
             # print('c', {type(str_val)})
-            # secs = str_val.total_seconds()
+            #slider_time = select_text/audio_total_length
+            # timestamp = time.strptime(select_text, '%H:%M:%S.%f')
+            #secs = datetime.timedelta(hours=timestamp.tm_hour, minutes=timestamp.tm_min, timestamp=timestamp.tm_sec).total_seconds()
+            #print(secs)
+            #time3=time.gmtime(int(select_text))
+            # secs = ((int(select_text)) % 60)
+            # minutes = round((int(select_text)) / 60) % 60
+            # timestamp = datetime.timedelta(int(select_text))
+            print(timestamp)
+            # timestamp_slider = time.strptime('%M:%S', timestamp)
+            # print(timestamp_slider)
+            slider.config(value=int(timestamp))
+            play_audio()
             # hours = int(secs / 3600)
             # minutes = int(secs / 60) % 60
             # print(secs)
@@ -279,7 +290,7 @@ def transcribe_action():
             # print(formatted_audio_length)
             # print(type(formatted_audio_length))
 
-        text_box.bind('<Double-1>', timelink)
+        text_box.bind('<Button-3>', timelink)
 
         if findtext:
             idx = '1.0'
