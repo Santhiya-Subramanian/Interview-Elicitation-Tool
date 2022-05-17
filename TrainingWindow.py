@@ -48,10 +48,11 @@ def play_audio():
     audio = audio_box.get(ACTIVE)
     audio_name = audio
     audio = f'{path}{audio}'
-    print(audio)
+    # print(audio)
 
     pygame.mixer.music.load(audio)
-    pygame.mixer.music.play(loops=0)
+    # print(slider.get())
+    pygame.mixer.music.play(loops=0, start=int(slider.get()))
     audio_Label.config(text=audio_name)
     # call audio length function
     audio_Time()
@@ -91,14 +92,14 @@ def pause_audio(is_paused):
         paused = True
 
 
-global count
-count = 0
+global play
+play = False
 
 
 def play_pause():
-    global count
-    count = count + 1
-    if count == 1:
+    global play
+    play = not play
+    if play:
         play_audio()
     else:
         pause_audio(paused)
@@ -118,8 +119,8 @@ def audio_Time():
     load_audio_to_mutagen = MP3(audio)
     global audio_total_length
     audio_total_length = load_audio_to_mutagen.info.length
-    print("audio total length type " )
-    print(type(audio_total_length))
+    # print("audio total length type ")
+    # print(type(audio_total_length))
     formatted_audio_length = time.strftime('%M:%S', time.gmtime(audio_total_length))
 
     current_time += 1
@@ -161,7 +162,7 @@ def slide(x):
 def transcribe_action():
     audio_file = audio_box.curselection()
     input_file_name = audio_box.get(audio_file)
-    print(input_file_name)
+    # print(input_file_name)
     # mb.showinfo("Json key", "Choose Json key")
     text_box.delete("1.0", "end")
 
@@ -208,7 +209,7 @@ def transcribe_action():
         words_list.append({
             'word': word_info.word,
             'speaker_tag': word_info.speaker_tag,
-            'start_time': word_info.start_time,
+            'start_time': word_info.start_time.seconds,
             'end_time': word_info.end_time,
         })
     # print(words_list)
@@ -244,6 +245,7 @@ def transcribe_action():
         'end_time': speaker_end_time
     })
     timer_list = []
+    timevalues = []
     for line in script:
         startTime = line['start_time']
         str_val = str(startTime)
@@ -251,35 +253,15 @@ def transcribe_action():
 
         text_box.insert(END, script)
         findtext = f"{str_val}  {'speaker'}"
-        print('timer_list', {str_val})
+        # print('timer_list', {str_val})
+        # print('timestamp', timer_list)
+        print('list', timevalues)
 
-        timer_list.append(str_val)
-        print('list', timer_list)
-
-        def timelink(evt):
-            mb.showinfo(title="success", message="clicked")
-            print(timer_list)
-
-            # print(text_box.get("sel.first", "sel.last"))
-            # print('b', {str_val})
-            # print('c', {type(str_val)})
-            # secs = str_val.total_seconds()
-            # hours = int(secs / 3600)
-            # minutes = int(secs / 60) % 60
-            # print(secs)
-            # print(hours)
-            # print(minutes)
-            # print(type(secs))
-            # print(type(secs))
-            # print(type(secs))
-            # time_obj = datetime.datetime.strptime(str(startTime), '%H:%M:%S').time()
-            # print(time_obj)
-            # print(type(time_obj))
-            # formatted_audio_length = time.strptime('%M:%S', time.time(str_val))
-            # print(formatted_audio_length)
-            # print(type(formatted_audio_length))
-
-        text_box.bind('<Double-1>', timelink)
+        def timelink(button_press):
+            print('button pressed', button_press)
+            print('inside', timevalues)
+            slider.config(value=int(button_press))
+            play_audio()
 
         if findtext:
             idx = '1.0'
@@ -298,9 +280,42 @@ def transcribe_action():
                 # overwrite 'Found' at idx
                 text_box.tag_add('found', idx, lastidx)
                 idx = lastidx
+                # print(idx)
 
             # mark located string as red
-            text_box.tag_config('found', foreground='red')
+            text_box.tag_config('found')
+
+        r = Button(text_box, text=str_val, command=lambda m=str_val: timelink(m))
+
+        timevalue = r.cget('text')
+        timevalues.append(timevalue)
+        # print('out of the function', timevalues)
+        timer_list.append(timevalue)
+        if (findtext and r):
+            idx = '1.0'
+            while 1:
+                # searches for desired string from index 1
+                idx = text_box.search(findtext, idx, nocase=1, stopindex=END)
+                # print(idx)
+                if not idx: break
+
+                # last index sum of current index and
+                # length of text
+                lastidx = '% s+% dc' % (idx, len(findtext))
+                text_box.insert(idx, '\n\n')
+
+                text_box.delete(idx, lastidx)
+                text_box.window_create(text_box.index(idx), window=r)
+                # text_box.insert(idx, r)
+                num = 3
+                lastidx = '% s+% dc' % (idx, num)
+
+                # overwrite 'Found' at idx
+                text_box.tag_add('found', idx, lastidx)
+                idx = lastidx
+
+            # mark located string as red
+            text_box.tag_config('found')
 
 
 global opened_file_name
@@ -465,10 +480,10 @@ def add_Tag():
         current_item = annotation_box.focus()
         current_value = annotation_box.item(current_item, 'values')
         print(current_value[0])
-        annotation_box.item(current_item, values=(current_value[0], dropdown_label.get("1.0", END), description_text.get("1.0", END)))
+        annotation_box.item(current_item,
+                            values=(current_value[0], dropdown_label.get("1.0", END), description_text.get("1.0", END)))
         # print(dropdown_label.get("1.0", END))
         # print(description_text.get("1.0", END))
-
 
     tag_label = Label(top, text='Select the Tag')
     tag_label.pack(pady=10)
@@ -507,7 +522,8 @@ def add_Tag():
     description_scroll = Scrollbar(description_frame)
     description_scroll.pack(side=RIGHT, fill=Y)
 
-    description_text = Text(description_frame, width=60, height=3, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
+    description_text = Text(description_frame, width=60, height=3, font=('times new roman', 16),
+                            selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
     description_text.pack(pady=10)
 
     button = Button(top, text="Ok", command=lambda: [gettag_values(), close_win(top)])
@@ -581,7 +597,6 @@ remove_button.pack(pady=10)
 audio_box = Listbox(leftFrame, bg='white', fg='black', width=60)
 audio_box.pack()
 
-
 play_pause_btn_img = Image.open('images/play_pause.png')
 # pause_btn_img = Image.open('images/pause.png')
 stop_btn_img = Image.open('images/stop.png')
@@ -643,7 +658,8 @@ text_frame.pack(pady=10)
 text_scroll = Scrollbar(text_frame)
 text_scroll.pack(side=RIGHT, fill=Y)
 
-text_box = Text(text_frame, width=40, height=15, font=('times new roman', 16), selectbackground='yellow', selectforeground='black', yscrollcommand=text_scroll.set)
+text_box = Text(text_frame, width=40, height=15, font=('times new roman', 16), selectbackground='yellow',
+                selectforeground='black', yscrollcommand=text_scroll.set)
 text_box.pack(pady=10)
 
 # annotation tool bar
@@ -698,3 +714,4 @@ main_window.geometry('1400x800')
 main_window.config(menu=menuBar)
 main_window.title("Interview Elicitation Tool")
 main_window.mainloop()
+
