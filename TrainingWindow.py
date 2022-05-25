@@ -285,7 +285,7 @@ def transcribe_action():
             # mark located string as red
             text_box.tag_config('found')
 
-        r = Button(text_box, text=str_val, command=lambda m=str_val: timelink(m))
+        r = Button(text_box, text=str_val, background='Green', command=lambda m=str_val: timelink(m))
 
         timevalue = r.cget('text')
         timevalues.append(timevalue)
@@ -302,11 +302,12 @@ def transcribe_action():
                 # last index sum of current index and
                 # length of text
                 lastidx = '% s+% dc' % (idx, len(findtext))
-                text_box.insert(idx, '\n\n')
-
+                text_box.insert(idx, '\n\n Speak')
+                # print('idx ', idx)
+                # print('index(idx)', text_box.index(idx))
                 text_box.delete(idx, lastidx)
                 text_box.window_create(text_box.index(idx), window=r)
-                # text_box.insert(idx, r)
+
                 num = 3
                 lastidx = '% s+% dc' % (idx, num)
 
